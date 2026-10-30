@@ -6,6 +6,11 @@ PDF Superapp combines document conversion, image-to-PDF conversion, and PDF pass
 
 ## Features
 
+- **Compress PDF:** adjustable 1–100% compression strength and a measured local trial estimate. The percentage is strength, not a guaranteed reduction. Higher settings reduce image quality; text remains text. Already optimized files may not shrink.
+- **Merge PDFs:** combine two or more PDFs in the listed order.
+- **Add PDF password:** require a new password to open the output, using AES-256.
+- **Split PDF:** extract page ranges (e.g. `1-3,5`) into one PDF, or export each selected page into a ZIP. Blank page ranges mean all pages.
+- **Edit PDF:** overlay Latin-1 text, rotate selected pages by 90/180/270 degrees, or delete pages from a new copy. Text positions use points (72 per inch) from the unrotated page’s top-left. Existing text cannot be rewritten or redacted.
 - **Word to PDF:** DOCX and UTF-8 TXT, including basic text, tables, and inline images.
 - **PDF to Word:** export extracted editable text and images to DOCX, or preserve page appearance as images.
 - **Images to PDF:** combine images in the chosen order. Supports common Pillow-readable formats including JPEG, PNG, BMP, GIF, TIFF, WebP, HEIC/HEIF, and AVIF where the installed decoder supports them. All animation and TIFF frames are included.
@@ -53,9 +58,21 @@ If PowerShell prevents running scripts, run the commands in `build.ps1` individu
 - Not every image format is supported. Camera RAW, SVG, and proprietary formats may fail. Transparency is placed on white.
 - Password removal requires a valid current password; this app does not crack or recover forgotten passwords. Use it with files you own or are authorized to modify.
 
+## PDF tool details
+
+Use **Estimate output size** after choosing a PDF and a compression strength. The app performs a temporary compression locally and reports the measured estimate. The final size is shown after saving. A strength of 100% does not mean a 100% reduction.
+
+For encrypted inputs, supply the current password. Merging accepts a shared password; unlock files separately first if their passwords differ. Compression, merging, splitting, editing, and password removal create unencrypted outputs. Use **Add PDF password** to protect an output. New passwords must match their confirmation and fit within 127 UTF-8 bytes.
+
+To run the PDF operation tests:
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
 ## Checks performed
 
-Sample checks covered DOCX-to-PDF, both PDF-to-DOCX modes, image-to-PDF, password removal including AES-256, wrong-password output preservation, and source overwrite protection. UI checks covered tool switching, file ordering/removal, and minimum-window layout. This is not a comprehensive document compatibility suite.
+Sample checks covered DOCX-to-PDF, both PDF-to-DOCX modes, image-to-PDF, password removal including AES-256, wrong-password output preservation, and source overwrite protection. UI checks covered tool switching, file ordering/removal, and minimum-window layout. Twelve automated tests cover compression/size estimation, merge order, page ranges, ZIP splitting, AES encryption, wrong-password behavior, text overlays, rotations, deletion, and source/output preservation. This is not a comprehensive document compatibility suite.
 
 ## Dependencies and licensing
 
