@@ -62,7 +62,7 @@ If PowerShell prevents running scripts, run the commands in `build.ps1` individu
 
 Use **Estimate output size** after choosing a PDF and a compression strength. The app performs a temporary compression locally and reports the measured estimate. The final size is shown after saving. A strength of 100% does not mean a 100% reduction.
 
-For encrypted inputs, supply the current password. Merging accepts a shared password; unlock files separately first if their passwords differ. Compression, merging, splitting, editing, and password removal create unencrypted outputs. Use **Add PDF password** to protect an output. New passwords must match their confirmation and fit within 127 UTF-8 bytes.
+The current-password field appears only under **Remove PDF password**. For encrypted inputs in other tools, first create an unlocked copy using that tool, then select the copy. **Add PDF password** shows only the new-password and confirmation fields. Compression, merging, splitting, editing, and password removal create unencrypted outputs. Use **Add PDF password** to protect an output. New passwords must match their confirmation and fit within 127 UTF-8 bytes.
 
 To run the PDF operation tests:
 
@@ -77,3 +77,7 @@ Sample checks covered DOCX-to-PDF, both PDF-to-DOCX modes, image-to-PDF, passwor
 ## Dependencies and licensing
 
 The application uses PyMuPDF, python-docx, Pillow, pillow-heif, ReportLab, pypdf, and cryptography; PyInstaller packages the Windows application. Their respective licenses continue to apply. Review the upstream license files before redistributing bundled software. No separate license for this project's original source has been selected.
+
+## Interface update (1.3.1)
+
+Each tool shows only its own settings. Merge PDFs, Word to PDF, and Images to PDF have no settings card. Other cards have specific titles, such as Compression strength and Pages to extract. Switching tools resets the scroll position, save actions remain visible in a fixed footer, and progress appears only while work is running. The window title includes the version so installed updates are easy to identify.

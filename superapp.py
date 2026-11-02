@@ -102,7 +102,7 @@ def convert(mode, sources, target, password='', appearance=False):
 class App(tk.Tk):
     TOOLS = {
         'Compress PDF': ('', 'Smaller files, adjustable quality', 'PDF documents', 'Strength 1–100% controls image compression, not a guaranteed size reduction. Higher values can reduce image quality. Estimate size runs a local trial. Output is unencrypted.'),
-        'Merge PDFs': ('', 'Combine PDFs in your chosen order', 'Two or more PDF documents', 'Add PDFs and reorder them before merging. Encrypted inputs must share the current password, or be unlocked first. Output is unencrypted.'),
+        'Merge PDFs': ('', 'Combine PDFs in your chosen order', 'Two or more PDF documents', 'Add PDFs and reorder them before merging. Unlock protected PDFs with Remove PDF password first. Output is unencrypted.'),
         'Add PDF password': ('', 'Protect your PDF with AES-256', 'PDF documents', 'Set a new password required to open the output. Keep it somewhere safe; the app cannot recover it.'),
         'Split PDF': ('', 'Extract pages or save each one separately', 'PDF documents', 'Enter ranges such as 1-3,5. Blank selects every page. Save a single extracted PDF or a ZIP containing one PDF per selected page. Output is unencrypted.'),
         'Edit PDF': ('', 'Add text, rotate or delete pages', 'PDF documents', 'Basic editing creates a new copy. Add text overlays; it does not replace or redact existing text. Positions use points from the unrotated page’s top-left. Output is unencrypted.'),
@@ -112,7 +112,7 @@ class App(tk.Tk):
         'Remove PDF password': ('◇', 'Unlock a copy of your PDF', 'Password-protected PDFs', 'Use the current password to save an unlocked copy. This tool does not recover forgotten passwords.')}
     def __init__(self):
         super().__init__()
-        self.title('PDF Superapp'); self.geometry('1080x780'); self.minsize(980,740)
+        self.title('PDF Superapp · 1.3.1'); self.geometry('1080x780'); self.minsize(980,740)
         self.configure(bg='#F5F6FA'); self.files=[]; self.events=queue.Queue(); self.busy=False; self.last_output=None
         self.mode=tk.StringVar(value='Word to PDF'); self.password=tk.StringVar(); self.appearance=tk.BooleanVar(); self.show_password=tk.BooleanVar()
         assets=Path(__file__).resolve().parent
@@ -123,7 +123,7 @@ class App(tk.Tk):
         style.configure('Card.TCheckbutton',background='#FFFFFF',foreground='#334155',font=('Segoe UI',10))
         style.map('Card.TCheckbutton',background=[('active','#FFFFFF')])
         self.columnconfigure(1,weight=1); self.rowconfigure(0,weight=1)
-        side=tk.Frame(self,bg='#151A30',width=226);side.grid(row=0,column=0,sticky='ns');side.grid_propagate(False)
+        side=tk.Frame(self,bg='#151A30',width=226);side.grid(row=0,column=0,rowspan=2,sticky='ns');side.grid_propagate(False)
         tk.Label(side,image=self.small_logo,bg='#151A30').pack(anchor='w',padx=24,pady=(28,12))
         self.label(side,'PDF Superapp',18,'#FFFFFF','#151A30',True).pack(anchor='w',padx=24)
         self.label(side,'A little less paperwork.',10,'#9DA7C1','#151A30').pack(anchor='w',padx=24,pady=(5,18))
@@ -136,13 +136,13 @@ class App(tk.Tk):
         self.label(foot,'●  Entirely on your computer',9,'#91DFBB','#151A30').pack(anchor='w')
         self.label(foot,'No uploads. No sign-in.',9,'#9DA7C1','#151A30').pack(anchor='w',pady=(6,0))
         holder=tk.Frame(self,bg='#F5F6FA');holder.grid(row=0,column=1,sticky='nsew')
-        canvas=tk.Canvas(holder,bg='#F5F6FA',highlightthickness=0)
+        canvas=tk.Canvas(holder,bg='#F5F6FA',highlightthickness=0);self.canvas=canvas
         scrollbar=ttk.Scrollbar(holder,orient='vertical',command=canvas.yview);scrollbar.pack(side='right',fill='y')
         canvas.pack(side='left',fill='both',expand=True);canvas.configure(yscrollcommand=scrollbar.set)
         main=tk.Frame(canvas,bg='#F5F6FA',padx=26,pady=24);window=canvas.create_window((0,0),window=main,anchor='nw')
         main.bind('<Configure>',lambda e:canvas.configure(scrollregion=canvas.bbox('all')))
         canvas.bind('<Configure>',lambda e:canvas.itemconfigure(window,width=e.width))
-        self.bind_all('<MouseWheel>',lambda e:canvas.yview_scroll(int(-e.delta/120),'units') if e.widget.winfo_class() not in ('Scale','TCombobox') else None)
+        self.bind_all('<MouseWheel>',self.scroll_workspace)
         main.columnconfigure(0,weight=1);main.rowconfigure(2,weight=1)
         header=tk.Frame(main,bg='#F5F6FA');header.grid(row=0,column=0,sticky='ew',pady=(0,18))
         self.label(header,'WORKSPACE',9,'#7C8296','#F5F6FA',True).pack(anchor='w')
@@ -167,7 +167,7 @@ class App(tk.Tk):
         self.down_btn=self.button(self.filebar,'Move down',lambda:self.move(1));self.down_btn.pack(side='left',padx=(8,0))
         self.remove_btn=self.button(self.filebar,'Remove',self.remove);self.remove_btn.pack(side='right')
         self.options=tk.Frame(main,bg='white',highlightbackground='#E3E6EE',highlightthickness=1,padx=22,pady=16);self.options.grid(row=3,column=0,sticky='ew',pady=(16,0))
-        self.label(self.options,'02   Conversion options',12,'#262B43','white',True).pack(anchor='w',pady=(0,10))
+        self.options_title=self.label(self.options,'',12,'#262B43','white',True);self.options_title.pack(anchor='w',pady=(0,10))
         self.passrow=tk.Frame(self.options,bg='white')
         self.label(self.passrow,'Current PDF password',10,'#666E85','white').pack(anchor='w',pady=(0,6))
         r=tk.Frame(self.passrow,bg='white');r.pack(fill='x')
@@ -180,12 +180,30 @@ class App(tk.Tk):
         self.new_password=tk.StringVar();self.confirm_password=tk.StringVar();self.pages=tk.StringVar()
         self.separate=tk.BooleanVar();self.action=tk.StringVar(value='Add text');self.edit_text=tk.StringVar()
         self.x=tk.StringVar(value='36');self.y=tk.StringVar(value='36');self.font_size=tk.StringVar(value='14')
-        bottom=tk.Frame(main,bg='#F5F6FA');bottom.grid(row=4,column=0,sticky='ew',pady=(18,0))
-        self.progress=ttk.Progressbar(bottom,mode='indeterminate',style='Accent.Horizontal.TProgressbar');self.progress.pack(fill='x',pady=(0,12))
+        footer=tk.Frame(self,bg='#F5F6FA');footer.grid(row=1,column=1,sticky='ew',padx=26,pady=(10,16))
+        bottom=tk.Frame(footer,bg='#F5F6FA');bottom.pack(fill='x');self.footer_buttons=bottom
+        self.progress=ttk.Progressbar(footer,mode='indeterminate',style='Accent.Horizontal.TProgressbar')
         self.convert_btn=self.button(bottom,'Convert and save  →',self.run,primary=True);self.convert_btn.pack(side='right')
         self.open_btn=self.button(bottom,'Open output folder',self.open_folder)
-        self.status=self.label(main,'Ready when you are.',10,'#737B91','#F5F6FA');self.status.configure(wraplength=720,justify='left');self.status.grid(row=5,column=0,sticky='ew',pady=(12,0))
+        self.status=self.label(footer,'Ready when you are.',10,'#737B91','#F5F6FA');self.status.configure(wraplength=720,justify='left');self.status.pack(fill='x',pady=(10,0))
         self.protocol('WM_DELETE_WINDOW',self.close);self.select_mode('Word to PDF');self.after(100,self.poll)
+    def scroll_workspace(self,event):
+        if event.widget.winfo_class() in ('Scale','TCombobox') or not event.delta:return
+        top,bottom=self.canvas.yview()
+        if top==0 and bottom==1:return
+        direction=-1 if event.delta>0 else 1
+        self.canvas.yview_scroll(direction*max(1,abs(int(event.delta/120))),'units')
+    def ensure_unlocked_inputs(self):
+        if self.mode.get() in ('Word to PDF','Images to PDF','Remove PDF password'):return True
+        try:
+            for source in self.files:
+                with fitz.open(source) as doc:
+                    if doc.needs_pass:
+                        messagebox.showinfo('Unlock this PDF first',f'{Path(source).name} is password protected. Use Remove PDF password first, then select the unlocked copy here.')
+                        return False
+        except Exception as exc:
+            messagebox.showerror('Cannot read PDF',str(exc));return False
+        return True
     def field(self,parent,label,variable,secret=False,width=None):
         self.label(parent,label,10,'#666E85','white').pack(anchor='w',pady=(7,4))
         entry=ttk.Entry(parent,textvariable=variable,show='•' if secret else '',width=width)
@@ -193,7 +211,7 @@ class App(tk.Tk):
         return entry
     def build_options(self,mode):
         for widget in self.extra.winfo_children():widget.destroy()
-        if mode not in MODES:return
+        if mode not in MODES or mode=='Merge PDFs':return
         self.extra.pack(fill='x',pady=(8,0))
         if mode=='Compress PDF':
             self.label(self.extra,'Compression strength: 1% gentle  →  100% strongest',10,'#666E85','white').pack(anchor='w')
@@ -225,8 +243,9 @@ class App(tk.Tk):
         return dict(strength=self.strength.get(),new_password=self.new_password.get(),confirm_password=self.confirm_password.get(),pages=self.pages.get(),separate=self.separate.get() if self.mode.get()=='Split PDF' else False,action=self.action.get(),text=self.edit_text.get(),x=self.x.get(),y=self.y.get(),font_size=self.font_size.get())
     def estimate(self):
         if self.busy or not self.files:return
+        if not self.ensure_unlocked_inputs():return
         source=self.files[0];strength=self.strength.get();password=self.password.get()
-        self.busy=True;self.refresh();self.progress.start(12);self.estimate_text.set('Estimating locally…');self.status.configure(text='Running a temporary compression trial…')
+        self.busy=True;self.refresh();self.progress.pack(fill='x',pady=(0,10),before=self.footer_buttons);self.progress.start(12);self.estimate_text.set('Estimating locally…');self.status.configure(text='Running a temporary compression trial…')
         def worker():
             try:
                 before,after=estimate_size(source,strength,password)
@@ -246,14 +265,20 @@ class App(tk.Tk):
         self.title_label.configure(text=mode);self.subtitle.configure(text=title);self.hint.configure(text=hint);self.format_label.configure(text=formats)
         for name,b in self.nav.items():b.configure(bg='#343054' if name==mode else '#151A30',fg='#FFFFFF' if name==mode else '#ABB5CF',activebackground='#343054',activeforeground='white')
         for widget in [self.passrow,self.appearance_check,self.default_option,self.extra]:widget.pack_forget()
-        if mode in MODES or mode in ('PDF to Word','Remove PDF password'):self.passrow.pack(fill='x',pady=(0,4))
-        else:self.default_option.pack(anchor='w')
+        headings={'Compress PDF':'Compression strength','Add PDF password':'Set a new password','Split PDF':'Pages to extract','Edit PDF':'Edit settings','PDF to Word':'Word output','Remove PDF password':'Unlock your PDF'}
+        if mode in headings:
+            self.options.grid();self.options_title.configure(text=headings[mode])
+        else:self.options.grid_remove()
+        if mode=='Remove PDF password':self.passrow.pack(fill='x',pady=(0,4))
         self.build_options(mode)
         if mode=='PDF to Word':self.appearance_check.pack(anchor='w',pady=(10,0))
         for b in (self.up_btn,self.down_btn):b.pack_forget()
         if mode in ('Images to PDF','Merge PDFs'):
             self.up_btn.pack(side='left',padx=(8,0));self.down_btn.pack(side='left',padx=(8,0))
         self.refresh();self.status.configure(text='Ready when you are.',fg='#737B91')
+        self.open_btn.pack_forget();self.last_output=None
+        self.convert_btn.configure(text={'Compress PDF':'Compress and save →','Merge PDFs':'Merge and save →','Add PDF password':'Protect and save →','Split PDF':'Split and save →','Edit PDF':'Apply edits and save →','Remove PDF password':'Unlock and save →'}.get(mode,'Convert and save →'))
+        self.update_idletasks();self.canvas.yview_moveto(0);self.after_idle(lambda:self.canvas.yview_moveto(0))
     def refresh(self):
         self.listbox.delete(0,'end')
         for i,f in enumerate(self.files):self.listbox.insert('end',f'  {i+1:02d}   {Path(f).name}')
@@ -261,7 +286,7 @@ class App(tk.Tk):
         self.listbox.pack_forget();self.empty.pack_forget()
         if self.files:self.listbox.pack(fill='both',expand=True,padx=12,pady=12)
         else:self.empty.pack(expand=True,fill='both',padx=12,pady=16)
-        self.convert_btn.configure(state='normal' if self.files and not self.busy else 'disabled')
+        self.convert_btn.configure(state='normal' if len(self.files)>=(2 if self.mode.get()=='Merge PDFs' else 1) and not self.busy else 'disabled')
     def choose(self):
         if self.busy:return
         mode=self.mode.get()
@@ -281,13 +306,14 @@ class App(tk.Tk):
         self.refresh()
     def run(self):
         if self.busy or not self.files:return
+        if not self.ensure_unlocked_inputs():return
         if self.mode.get()=='Edit PDF' and self.action.get()=='Delete pages' and not messagebox.askyesno('Delete selected pages?', 'Remove the selected pages from the new output copy? The source stays unchanged.'):return
         ext='.zip' if self.mode.get()=='Split PDF' and self.separate.get() else '.docx' if self.mode.get()=='PDF to Word' else '.pdf'
         target=filedialog.asksaveasfilename(defaultextension=ext,initialfile=Path(self.files[0]).stem+'_converted'+ext,filetypes=[('Output','*'+ext)])
         if not target:return
         args=(self.mode.get(),list(self.files),target,self.password.get(),self.appearance.get())
         options=self.operation_options()
-        self.busy=True;self.refresh();self.progress.start(12);self.status.configure(text='Converting on your computer…',fg='#6554E8');self.open_btn.pack_forget()
+        self.busy=True;self.refresh();self.progress.pack(fill='x',pady=(0,10),before=self.footer_buttons);self.progress.start(12);self.status.configure(text='Converting on your computer…',fg='#6554E8');self.open_btn.pack_forget()
         def worker():
             try:
                 if args[0] in MODES:operate(args[0],args[1],args[2],args[3],**options)
@@ -297,7 +323,7 @@ class App(tk.Tk):
         threading.Thread(target=worker,daemon=True).start()
     def poll(self):
         try:
-            ok,text=self.events.get_nowait();self.busy=False;self.progress.stop();self.refresh()
+            ok,text=self.events.get_nowait();self.busy=False;self.progress.stop();self.progress.pack_forget();self.refresh()
             if ok=='estimate':
                 strength, result=text
                 self.estimate_text.set(result if strength==self.strength.get() else 'Strength changed. Estimate again.')
